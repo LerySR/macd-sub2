@@ -216,6 +216,12 @@ const analyzeImage = async () => {
                 .done(function(data) {
                     // Show formatted JSON on webpage.
                     $("#responseTextArea").val(JSON.stringify(data, null, 2));
+                    console.log(data.categories[0].name);
+                    console.log(data.description.captions[0]);
+                    console.log(data)
+                    desk1 = data.description.captions[0].text;
+                    desk = data.categories[0].name;
+                    document.getElementById("deskripsi").innerHTML = (desk1);
                 })
  
                 .fail(function(jqXHR, textStatus, errorThrown) {
@@ -262,6 +268,7 @@ Enter the URL to an image, then click the <strong>Analyze image</strong> button.
         Source image:
         <br><br>
         <img id="sourceImage" width="300" />
+        <figcaption id="deskripsi"></figcaption>
     </div>
 </div>
 </div>
