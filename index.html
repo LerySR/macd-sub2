@@ -178,7 +178,7 @@ const analyzeImage = async () => {
                 //url=`https://${accountName}.blob.core.windows.net/${containerName}?${sasString}`
                 const blobURL = azblob.BlobURL.fromContainerURL(containerURL, option.text);
                 var url = `https://${accountName}.blob.core.windows.net/${containerName}/${option.text}`;
-                alert(url);
+                //alert(url);
 
                 var subscriptionKey = "01ec88fa72364322843d631562f1e3cb";
                 var uriBase =
