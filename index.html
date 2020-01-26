@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Analyze Sample</title>
+    <link href="https://fonts.googleapis.com/css?family=Fira+Sans&display=swap" rel="stylesheet">
+    <style type="text/css">
+        .container{
+            width: 900px;
+            margin:0 auto;
+        }
+        .header
+        {
+            font-family: 'Fira Sans', sans-serif;
+            background  : #3399ff;
+            height      : 10%;
+            font-size   : 1.5em;
+            text-align  :center;
+            padding-top : 0px;
+        }
+        .sidebar
+        {
+            font-family: 'Fira Sans', sans-serif;
+            background  : whitesmoke;  
+            float       : left;
+            height      : 1000px;
+            width       : 100%;
+            font-size   : 1em;
+            text-align  : left;
+            color       : black;
+            padding-top : 20px;
+            padding-left: 20px;
+            padding-right: 20px;
+         
+        }
+        .content
+        {
+            font-family: 'Fira Sans', sans-serif;
+            background  : grey;
+            float       : right;
+            width       : 40%;
+            height      : 1120px;
+            font-size   : 1em;
+            text-align  : left;
+            word-spacing: 0%;
+            padding-top : 20px; 
+            padding-left: 20px;
+            padding-right: 20px;
+        }
+        .footer
+        {
+            font-family: 'Fira Sans', sans-serif;
+            background  : #3399ff;
+            clear       : both;
+            font-size   : 1em;
+            text-align  :center;
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <div class="header">
+        <H8>Image Analyzer</H8>
+    </div>
+    <div class="sidebar">
+    <button id="select-button">Upload <br>Gambar</button>
+    <input type="file" id="file-input" multiple style="display: none;" />
+    <button id="list-button">Daftar Gambar <br> pada Blob Storage</button>
+    <button id="delete-button">Hapus Gambar <br>yang dipilih</button>
+    <button id="analyze-image">Analisa Gambar <br>yang dipilih</button>
+
+    <p>Status:</p>
+    <p id="status" style="height:160px; width: 300px; overflow: scroll;" />
+
+    <p>Pilih gambar yang dendak dianalisa/dihapus <br> dibawah ini:</p>
+    <select id="file-list" multiple style="height:160px; width: 300px; overflow: scroll;" />
+
+
+
+
+<script src="azure-storage-blob.js" charset="utf-8"></script>
+<script src="http://ajax.googleapis.com/ajax/libs/jquery/1.9.0/jquery.min.js"></script>
+
+<script>
+const selectButton = document.getElementById("select-button");
+const fileInput = document.getElementById("file-input");
+const listButton = document.getElementById("list-button");
+const deleteButton = document.getElementById("delete-button");
+const status = document.getElementById("status");
+const fileList = document.getElementById("file-list");
+const analyzeButton = document.getElementById("analyze-image");
+
+const reportStatus = message => {
+    status.innerHTML += `${message}<br/>`;
+    status.scrollTop = status.scrollHeight;
+}
+
+const accountName = "dicodingmacd";
+    const sasString = "se=2020-12-12&sp=rwdlac&sv=2018-03-28&ss=b&srt=sco&sig=7vKjTsJeJXxGb8o9p9K%2BRtGlAj8dNizLz%2Bh0xgwSzt0%3D";
+    const containerName = "blobstorage-container";
+    const containerURL = new azblob.ContainerURL(
+        `https://${accountName}.blob.core.windows.net/${containerName}?${sasString}`,
+        azblob.StorageURL.newPipeline(new azblob.AnonymousCredential));
+
+//container
+
+const listFiles = async () => {
+    fileList.size = 0;
+    fileList.innerHTML = "";
+    try {
+        reportStatus("Memperbarui daftar gambar...");
+        let marker = undefined;
+        do {
+            const listBlobsResponse = await containerURL.listBlobFlatSegment(
+                azblob.Aborter.none, marker);
+            marker = listBlobsResponse.nextMarker;
+            const items = listBlobsResponse.segment.blobItems;
+            for (const blob of items) {
+                fileList.size += 1;
+                fileList.innerHTML += `<option>${blob.name}</option>`;
+            }
+        } while (marker);
+        if (fileList.size > 0) {
+            reportStatus("Selesai");
+        } else {
+            reportStatus("The blob storage container does not contain any files.");
+        }
+    } catch (error) {
+        reportStatus(error.body.message);
+    }
+};
+
+listButton.addEventListener("click", listFiles);
+
+const uploadFiles = async () => {
+    try {
+        reportStatus("Uploading...");
+        const promises = [];
+        for (const file of fileInput.files) {
+            const blockBlobURL = azblob.BlockBlobURL.fromContainerURL(containerURL, file.name);
+            promises.push(azblob.uploadBrowserDataToBlockBlob(
+                azblob.Aborter.none, file, blockBlobURL));
+        }
+        await Promise.all(promises);
+        reportStatus("Selesai");
+        listFiles();
+    } catch (error) {
+        reportStatus(error.body.message);
+    }
+}
+
+selectButton.addEventListener("click", () => fileInput.click());
+fileInput.addEventListener("change", uploadFiles);
+
+const deleteFiles = async () => {
+    try {
+        if (fileList.selectedOptions.length > 0) {
+            reportStatus("Menghapus...");
+            for (const option of fileList.selectedOptions) {
+                const blobURL = azblob.BlobURL.fromContainerURL(containerURL, option.text);
+                await blobURL.delete(azblob.Aborter.none);
+            }
+            reportStatus("Selesai");
+            listFiles();
+        } else {
+            reportStatus("Pilih gambar terlebih dahulu!");
+        }
+    } catch (error) {
+        reportStatus(error.body.message);
+    }
+};
+deleteButton.addEventListener("click", deleteFiles);
+
+const analyzeImage = async () => {
+    try {
+        if (fileList.selectedOptions.length > 0) {
+            reportStatus("Menganalisa...");
+            for ( const option of fileList.selectedOptions){
+                //url=`https://${accountName}.blob.core.windows.net/${containerName}?${sasString}`
+                const blobURL = azblob.BlobURL.fromContainerURL(containerURL, option.text);
+                var url = `https://${accountName}.blob.core.windows.net/${containerName}/${option.text}`;
+                //alert(url);
+
+                var subscriptionKey = "01ec88fa72364322843d631562f1e3cb";
+                var uriBase =
+                    "https://southeastasia.api.cognitive.microsoft.com/vision/v2.0/analyze";
+                
+                // Request parameters.
+                var params = {
+                    "visualFeatures": "Categories,Description,Color",
+                    "details": "",
+                    "language": "en",
+                };
+ 
+                // Display the image.
+                //var sourceImageUrl ="https://dicodingmacd.blob.core.windows.net/blobstorage-container/Lery.jpg";
+                var sourceImageUrl = `https://${accountName}.blob.core.windows.net/${containerName}/${option.text}`;
+                document.querySelector("#sourceImage").src = sourceImageUrl;
+ 
+                // Make the REST API call.
+                $.ajax({
+                 url: uriBase + "?" + $.param(params),
+ 
+                    // Request headers.
+                    beforeSend: function(xhrObj){
+                        xhrObj.setRequestHeader("Content-Type","application/json");
+                        xhrObj.setRequestHeader(
+                            "Ocp-Apim-Subscription-Key", subscriptionKey);
+                    },
+ 
+                    type: "POST",
+ 
+                    // Request body.
+                    data: '{"url": ' + '"' + sourceImageUrl + '"}',
+                })
+ 
+                .done(function(data) {
+                    // Show formatted JSON on webpage.
+                    $("#responseTextArea").val(JSON.stringify(data, null, 2));
+                })
+ 
+                .fail(function(jqXHR, textStatus, errorThrown) {
+                    // Display error message.
+                    var errorString = (errorThrown === "") ? "Error. " :
+                        errorThrown + " (" + jqXHR.status + "): ";
+                    errorString += (jqXHR.responseText === "") ? "" :
+                        jQuery.parseJSON(jqXHR.responseText).message;
+                    alert(errorString);
+            }); 
+        };
+        //alert(option.text);
+        reportStatus("Selesai");
+            listFiles();
+        } else {
+            reportStatus("Pilih gambar terlebih dahulu!");
+        }
+    } catch (error) {
+        reportStatus(error.body.message);
+
+}
+};
+
+analyzeButton.addEventListener("click", analyzeImage)
+
+</script>
+
+</div>
+<br><br>
+<h1>Analyze image:</h1>
+Enter the URL to an image, then click the <strong>Analyze image</strong> button.
+<br><br>
+<input type="text" name="inputImage" id="inputImage"
+    value="" />
+<br><br>
+<div id="wrapper" style="width:800px; display:table;">
+    <div id="jsonOutput" style="width:600px; display:table-cell;">
+        Deskripsi Hasil Analisa Gambar:
+        <br><br>
+        <textarea id="responseTextArea" class="UIInput"
+                  style="width:300px; height:300px;"></textarea>
+    </div>
+    <div id="imageDiv" style="width:600px; display:table-cell;">
+        Source image:
+        <br><br>
+        <img id="sourceImage" width="300" />
+    </div>
+</div>
+</div>
+
+</body>
+</html>
